@@ -1,0 +1,136 @@
+<html>
+<head>
+  <title>fireworks</title>
+  <style type="text/css">
+    html { width: 100%; height: 100%; }
+    body { background-color: #000000; width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <canvas />
+  <script type="text/javascript">
+  var Particle = (function() {
+    return function(initX, initY, angle, ttl, speed, color) {
+      var life = ttl
+      var x = initX
+      var y = initY
+
+      function isAlive() { return life >= 0 }
+
+      return Object.freeze({
+        advance: function() {
+          if(!isAlive()) {
+            return
+          }
+          var deltaH = speed
+          var deltaX = deltaH * Math.cos(angle)
+          var deltaY = deltaH * Math.sin(angle)
+          x += deltaX
+          y += deltaY
+          --life
+        },
+        color: color,
+        getX: function() { return x },
+        getY: function() { return y },
+        getLife: function() { return life },
+        ttl: ttl,
+        isAlive: isAlive
+      })
+    }
+  })()
+
+  var Explosion = (function() {
+    return function(initX, initY) {
+      var particlesInGeneration = 25
+      var generationInterval = 2
+      var ttl = 20
+      var life = ttl
+      var particles = []
+
+      function createGeneration() {
+        var r = 255*Math.random()|0
+        var g = 255*Math.random()|0
+        var b = 255*Math.random()|0
+        var color = 'rgb(' + r + ',' + g + ',' + b + ')'
+        for(i=0; i < particlesInGeneration; ++i) {
+          var randomAngle = Math.random() * 2 * Math.PI
+
+          particles.push(new Particle(initX, initY, randomAngle, 50, 1, color))
+        }
+      }
+
+      return Object.freeze({
+        inProgress: function() {
+          return particles.map(function(p) {
+            return p.isAlive()
+          }).reduce(function(ps, p) {
+            return ps || p
+          }, false)
+        },
+        advance: function() {
+          particles.forEach(function(particle) {
+            particle.advance()
+          })
+          if(life > 0 && life % generationInterval === 0) {
+            createGeneration()
+          }
+          --life
+        },
+        particles: particles
+      })
+    }
+  })()
+
+  var canvas = document.querySelector('canvas')
+  canvas.width = window.innerWidth
+  canvas.height = window.innerHeight
+  window.addEventListener('resize', function() {
+    canvas.width = window.innerWidth
+    canvas.height = window.innerHeight
+  })
+
+  var ctx = canvas.getContext('2d')
+  var effects = []
+  var simultaneousExplosions = 4
+
+  function generateExplosion() {
+    var x = Math.random() * canvas.width
+    var y = Math.random() * canvas.height * 2 / 3
+    effects.push(new Explosion(x, y))
+  }
+
+  function run() {
+    ctx.clearRect(0,0,canvas.width,canvas.height)
+
+    var tstamp = new Date().getTime()
+    if(tstamp % 23 === 0) {
+      generateExplosion()
+    }
+
+    effects.forEach(function(effect) {
+      effect.advance()
+      effect.particles.forEach(function(p) {
+        if(!p.isAlive()) return
+
+        var x = Math.round(p.getX())
+        var y = Math.round(p.getY())
+
+        var alpha = Math.min(0.2 + (p.getLife() / p.ttl), 1)
+        ctx.globalAlpha = alpha
+
+        ctx.fillStyle = p.color
+        ctx.fillRect(x,y,2,2);
+      })
+
+    })
+
+    effects = effects.filter(function(effect) {
+      return effect.inProgress()
+    })
+
+    window.requestAnimationFrame(run)
+  }
+
+  window.requestAnimationFrame(run)
+  </script>
+</body>
